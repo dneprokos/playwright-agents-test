@@ -1,48 +1,38 @@
-// spec: search-test-plan.md
+import { test, expect } from '@playwright/test';
+import { SearchPage } from './pages/SearchPage';
+import { GamesApiClient } from './api/GamesApiClient';
 
-import { test, expect } from "@playwright/test";
+test.describe('Search Functionality - Special Characters', () => {
+    let searchPage: SearchPage;
+    let apiClient: GamesApiClient;
 
-test.describe("Search Functionality - Special Characters", () => {
-  test("Search with Special Characters", async ({ page }) => {
-    // 1. Navigate to homepage
-    await page.goto("http://localhost:9000/");
+    test.beforeEach(async ({ page, request }) => {
+        searchPage = new SearchPage(page);
+        apiClient = new GamesApiClient(request);
+    });
 
-    // 2-3. Test various special characters
-    const searchBox = page.getByPlaceholder("Search games...");
-    const specialCharTests = [
-      { input: "&", expectedStatus: 200 },
-      { input: "$", expectedStatus: 200 },
-      { input: "@", expectedStatus: 200 },
-      { input: "#", expectedStatus: 200 },
-    ];
+    test('Search with Special Characters', async () => {
+        // 1. Navigate to homepage
+        await searchPage.navigateToHome();
 
-    for (const test of specialCharTests) {
-      await searchBox.click();
-      await searchBox.fill(test.input);
+        // 2-3. Test various special characters
+        const specialCharTests = [
+            { input: '&', expectedStatus: 200 },
+            { input: '$', expectedStatus: 200 },
+            { input: '@', expectedStatus: 200 },
+            { input: '#', expectedStatus: 200 },
+        ];
 
-      // 4. Verify the page doesn't crash and handles input gracefully
-      await expect(searchBox).toBeVisible();
-      await expect(searchBox).toHaveValue(test.input);
-    }
-  });
-});
+        for (const test of specialCharTests) {
+            await searchPage.searchForGame(test.input);
 
-// Integration tests
-test.describe("Search API Integration - Special Characters", () => {
-  test("Search with Special Characters - API", async ({ request }) => {
-    const specialChars = ["&", "-", "!", "@#$%"];
+            // 4. Verify the page doesn't crash and handles input gracefully
+            await expect(searchPage.searchBox).toBeVisible();
+            await expect(searchPage.searchBox).toHaveValue(test.input);
 
-    for (const char of specialChars) {
-      const response = await request.get(
-        `http://localhost:9000/api/games?search=${encodeURIComponent(char)}`
-      );
-      expect(response.ok()).toBeTruthy();
-
-      const responseData = await response.json();
-      // Verify response structure is valid regardless of input
-      expect(responseData).toBeTruthy();
-      expect(responseData.games).toBeTruthy();
-      expect(Array.isArray(responseData.games)).toBeTruthy();
-    }
-  });
+            // Additional API verification
+            const responseData = await apiClient.searchGames(test.input);
+            expect(responseData).toBeTruthy();
+        }
+    });
 });

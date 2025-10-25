@@ -1,56 +1,48 @@
-// spec: search-test-plan.md
+import { test } from '@playwright/test';
+import { SearchPage } from './pages/SearchPage';
+import { GamesApiClient } from './api/GamesApiClient';
 
-import { test, expect } from "@playwright/test";
+test.describe('Search Functionality', () => {
+    let searchPage: SearchPage;
+    let apiClient: GamesApiClient;
 
-test.describe("Search Functionality", () => {
-  test("Search for a Game by Full Title", async ({ page }) => {
-    // 1. Navigate to homepage
-    await page.goto("http://localhost:9000/");
+    test.beforeEach(async ({ page, request }) => {
+        searchPage = new SearchPage(page);
+        apiClient = new GamesApiClient(request);
+    });
 
-    // 2. Focus on the search textbox and type "Contra"
-    const searchBox = page.getByPlaceholder("Search games...");
-    await searchBox.click();
-    await searchBox.fill("Contra");
+    test('Search for a Game by Full Title', async () => {
+        // 1. Navigate to homepage
+        await searchPage.navigateToHome();
 
-    // 3. Verify filtered results
-    await expect(page.getByText("Contra")).toBeVisible();
+        // 2. Search for game
+        await searchPage.searchForGame('Contra');
 
-    // 4. Verify other games are not visible
-    await expect(page.getByText("Super Mario")).not.toBeVisible();
+        // 3. Verify filtered results
+        await searchPage.verifyGameVisible('Contra');
 
-    // 5. Verify pagination update
-    const paginationInfo = page.getByText(/Showing \d+ of \d+ games/);
-    await expect(paginationInfo).toBeVisible();
-  });
+        // 4. Verify other games are not visible
+        await searchPage.verifyGameNotVisible('Super Mario');
+
+        // 5. Verify pagination update
+        await searchPage.verifyPaginationVisible();
+    });
 });
 
-// Integration tests
-test.describe("Search API Integration", () => {
-  test("Search for a Game by Full Title - API", async ({ request }) => {
-    const response = await request.get(
-      "http://localhost:9000/api/games?search=Contra"
-    );
-    expect(response.ok()).toBeTruthy();
+test.describe('Search API Integration', () => {
+    let apiClient: GamesApiClient;
 
-    const responseData = await response.json();
-    expect(responseData).toBeTruthy();
-    expect(responseData.games).toBeTruthy();
-    expect(responseData.games[0]).toEqual(
-      expect.objectContaining({
-        name: expect.stringContaining("Contra"),
-      })
-    );
-  });
+    test.beforeEach(async ({ request }) => {
+        apiClient = new GamesApiClient(request);
+    });
 
-  test("Search with No Results - API", async ({ request }) => {
-    const response = await request.get(
-      "http://localhost:9000/api/games?search=nonexistent"
-    );
-    expect(response.ok()).toBeTruthy();
+    test('Search for a Game by Full Title - API', async () => {
+        const responseData = await apiClient.searchGames('Contra');
+        await apiClient.verifyGameInResults(responseData, 'Contra');
+    });
 
-    const responseData = await response.json();
-    expect(responseData).toBeTruthy();
-    expect(responseData.games).toBeTruthy();
-    expect(responseData.games.length).toBe(0);
-  });
+    test('Search with No Results - API', async () => {
+        const responseData = await apiClient.searchGames('nonexistent');
+        await apiClient.verifyNoResults(responseData);
+    });
 });

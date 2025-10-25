@@ -1,44 +1,40 @@
-// spec: search-test-plan.md
+import { test } from '@playwright/test';
+import { SearchPage } from './pages/SearchPage';
+import { GamesApiClient } from './api/GamesApiClient';
 
-import { test, expect } from "@playwright/test";
+test.describe('Search Functionality - Partial Title', () => {
+    let searchPage: SearchPage;
+    let apiClient: GamesApiClient;
 
-test.describe("Search Functionality - Partial Title", () => {
-  test("Search for a Game by Partial Title", async ({ page }) => {
-    // 1. Navigate to homepage
-    await page.goto("http://localhost:9000/");
+    test.beforeEach(async ({ page, request }) => {
+        searchPage = new SearchPage(page);
+        apiClient = new GamesApiClient(request);
+    });
 
-    // 2-3. Focus and type partial name
-    const searchBox = page.getByPlaceholder("Search games...");
-    await searchBox.click();
-    await searchBox.fill("Man");
+    test('Search for a Game by Partial Title', async () => {
+        // 1. Navigate to homepage
+        await searchPage.navigateToHome();
 
-    // 4. Verify matching games are displayed - check for specific games
-    await expect(
-      page.getByRole("heading", { name: "Mega Man 2" })
-    ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Pac-Man" })).toBeVisible();
+        // 2-3. Focus and type partial name
+        await searchPage.searchForGame('Man');
 
-    // 5. Verify non-matching games are hidden
-    await expect(page.getByText("Contra")).not.toBeVisible();
-  });
+        // 4. Verify matching games are displayed
+        await searchPage.verifyMultipleGamesVisible(['Mega Man 2', 'Pac-Man']);
+
+        // 5. Verify non-matching games are hidden
+        await searchPage.verifyGameNotVisible('Contra');
+    });
 });
 
-// Integration test
-test.describe("Search API Integration - Partial Title", () => {
-  test("Search for Games by Partial Title - API", async ({ request }) => {
-    const response = await request.get(
-      "http://localhost:9000/api/games?search=Man"
-    );
-    expect(response.ok()).toBeTruthy();
+test.describe('Search API Integration - Partial Title', () => {
+    let apiClient: GamesApiClient;
 
-    const responseData = await response.json();
-    expect(responseData).toBeTruthy();
-    expect(responseData.games).toBeTruthy();
-    expect(responseData.games.length).toBeGreaterThan(0);
-    expect(
-      responseData.games.some((game: { name: string }) =>
-        game.name.includes("Man")
-      )
-    ).toBeTruthy();
-  });
+    test.beforeEach(async ({ request }) => {
+        apiClient = new GamesApiClient(request);
+    });
+
+    test('Search for Games by Partial Title - API', async () => {
+        const responseData = await apiClient.searchGames('Man');
+        await apiClient.verifyGameInResults(responseData, 'Man');
+    });
 });
